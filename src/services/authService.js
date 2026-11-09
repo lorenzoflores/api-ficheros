@@ -2,11 +2,12 @@
 
 const bcrypt = require('bcrypt');
 const { pool } = require('../db/pool');
+const { config } = require('../config');
 const AppError = require('./AppError');
 const tokenService = require('./tokenService');
 
 // Coste de bcrypt: 12 en ejecución real; 4 (el mínimo) en tests para que sean rápidos.
-const SALT_ROUNDS = process.env.NODE_ENV === 'test' ? 4 : 12;
+const SALT_ROUNDS = config.env === 'test' ? 4 : 12;
 const PG_UNIQUE_VIOLATION = '23505';
 
 const invalidCredentials = () =>

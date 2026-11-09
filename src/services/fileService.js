@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pool } = require('../db/pool');
+const { config } = require('../config');
 const AppError = require('./AppError');
 const { detectMimeType } = require('./fileTypeService');
 
@@ -13,13 +14,9 @@ const MAX_NAME_LENGTH = 255;
 
 const notFound = () => new AppError(404, 'NOT_FOUND', 'Recurso no encontrado');
 
-function getUploadDir() {
-  return path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '..', '..', 'uploads'));
-}
-
 // En disco el fichero se llama como su id (un UUID validado): el nombre original nunca forma la ruta.
 function diskPath(id) {
-  return path.join(getUploadDir(), id);
+  return path.join(config.uploadDir, id);
 }
 
 // El nombre original es solo metadato, pero se limpia: sin rutas, sin caracteres de control.
@@ -55,7 +52,7 @@ async function upload(userId, file) {
 
   // Primero los bytes y después los metadatos: si algo falla a medias, como mucho queda un
   // fichero huérfano en disco (inaccesible), nunca una fila que apunte a un fichero inexistente.
-  await fs.mkdir(getUploadDir(), { recursive: true });
+  await fs.mkdir(config.uploadDir, { recursive: true });
   await fs.writeFile(target, file.buffer, { flag: 'wx' });
 
   try {
@@ -123,4 +120,4 @@ async function remove(userId, fileId) {
   }
 }
 
-module.exports = { upload, list, openForDownload, remove, getUploadDir };
+module.exports = { upload, list, openForDownload, remove };

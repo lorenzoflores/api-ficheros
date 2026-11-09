@@ -42,7 +42,7 @@ Cualquier ruta no definida responde **404** con el formato de error estándar. U
 - Respuesta 201: `{ "id": "<uuid>", "email": "ana@example.com" }`. Nunca se devuelve la contraseña ni su hash.
 
 **POST /auth/login** — mismo cuerpo que el registro.
-- Respuesta 200: `{ "token": "<jwt>" }`. El token incluye el id de usuario (`sub`) y caduca en 1 hora.
+- Respuesta 200: `{ "token": "<jwt>" }`. El token incluye el id de usuario (`sub`) y caduca en 1 hora (configurable con `JWT_EXPIRES_IN`).
 - Email inexistente y contraseña incorrecta producen **la misma** respuesta 401, para no revelar qué emails existen.
 - En el login solo se exige que `email` sea válido y `password` no esté vacía (400 si no); las reglas de longitud del registro no se reaplican.
 
@@ -66,7 +66,7 @@ Cualquier ruta no definida responde **404** con el formato de error estándar. U
 
 ### 1.4 Reglas de subida
 
-- **Tamaño máximo: 10 MB = 10 485 760 bytes.** Un fichero de exactamente 10 485 760 bytes se acepta; uno de 10 485 761 o más se rechaza con **413**.
+- **Tamaño máximo: 10 MB = 10 485 760 bytes** (valor por defecto de `MAX_FILE_SIZE_BYTES`). Un fichero de exactamente 10 485 760 bytes se acepta; uno de 10 485 761 o más se rechaza con **413**.
 - **Tipos permitidos**, detectados por los primeros bytes del contenido (*magic numbers*), ignorando extensión y `Content-Type` declarado:
 
   | Tipo        | MIME resultante   | Regla de detección                                                        |
@@ -127,7 +127,19 @@ Catálogo de códigos:
 ### 1.8 Requisitos no funcionales mínimos
 
 - Las contraseñas se guardan con un hash lento (p. ej. bcrypt), nunca en claro.
-- El secreto del JWT se lee de la variable de entorno `JWT_SECRET` (mínimo 32 caracteres); el servidor no arranca sin ella. Los tokens se firman con HS256 y solo se acepta ese algoritmo.
+- Toda la configuración procede de variables de entorno (o de un fichero `.env`, que no se versiona), validadas en `src/config.js` al arrancar:
+
+  | Variable              | Obligatoria | Por defecto | Regla                                              |
+  |-----------------------|-------------|-------------|----------------------------------------------------|
+  | `PORT`                | No          | `3000`      | Entero 1–65535                                     |
+  | `DATABASE_URL`        | Sí          | —           | URL `postgres://` o `postgresql://`                |
+  | `JWT_SECRET`          | Sí          | —           | Mínimo 32 caracteres                               |
+  | `JWT_EXPIRES_IN`      | No          | `1h`        | Segundos, o número con unidad `s`, `m`, `h`, `d`   |
+  | `UPLOAD_DIR`          | No          | `./uploads` | Ruta; si es relativa, desde la raíz del proyecto   |
+  | `MAX_FILE_SIZE_BYTES` | No          | `10485760`  | Entero positivo                                    |
+
+  Si falta una obligatoria o alguna no es válida, ni el servidor ni las migraciones arrancan (código de salida 1). El mensaje nombra la variable pero nunca muestra su valor.
+- Los tokens se firman con HS256 y solo se acepta ese algoritmo.
 - El nombre original del fichero se guarda solo como metadato: en disco se almacena con un nombre generado (el `id`), de modo que un nombre como `../../etc/passwd` no tiene efecto.
 
 ---

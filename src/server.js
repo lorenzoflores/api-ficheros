@@ -1,23 +1,21 @@
 'use strict';
 
-require('dotenv').config({ quiet: true });
-
-const app = require('./app');
-const { pool } = require('./db/pool');
-const { getSecret } = require('./services/tokenService');
-
-// SPEC 1.8: sin un JWT_SECRET válido el servidor no arranca.
+// La configuración se valida al cargarla: si falta una variable obligatoria o
+// JWT_SECRET es demasiado corto, el servidor no arranca (SPEC 1.8).
+let config;
 try {
-  getSecret();
+  ({ config } = require('./config'));
 } catch (err) {
+  if (err.name !== 'ConfigError') throw err;
   console.error(err.message);
   process.exit(1);
 }
 
-const PORT = Number(process.env.PORT) || 3000;
+const app = require('./app');
+const { pool } = require('./db/pool');
 
-const server = app.listen(PORT, () => {
-  console.log(`API escuchando en http://localhost:${PORT}`);
+const server = app.listen(config.port, () => {
+  console.log(`API escuchando en http://localhost:${config.port}`);
 });
 
 function shutdown(signal) {

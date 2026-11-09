@@ -46,7 +46,13 @@ async function migrate(pool, { log = console.log } = {}) {
 }
 
 if (require.main === module) {
-  require('dotenv').config({ quiet: true });
+  try {
+    require('../config');
+  } catch (err) {
+    if (err.name !== 'ConfigError') throw err;
+    console.error(err.message);
+    process.exit(1);
+  }
   const { pool } = require('./pool');
 
   migrate(pool)

@@ -3,6 +3,7 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const app = require('../src/app');
+const { config } = require('../src/config');
 const { pool, resetDb } = require('./helpers/db');
 
 const EMAIL = 'ana@example.com';
@@ -107,7 +108,7 @@ describe('POST /auth/login', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ token: expect.any(String) });
 
-    const payload = jwt.verify(res.body.token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwt.verify(res.body.token, config.jwt.secret, { algorithms: ['HS256'] });
     expect(payload.sub).toBe(userId);
     expect(payload.exp - payload.iat).toBe(3600);
   });

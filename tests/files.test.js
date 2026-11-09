@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const request = require('supertest');
 const app = require('../src/app');
+const { config } = require('../src/config');
 const { pool, resetDb } = require('./helpers/db');
 const { createUser } = require('./helpers/auth');
 const { fixtures } = require('./helpers/fixtures');
@@ -33,7 +34,7 @@ function download(token, id) {
 const listIds = async (token) =>
   (await request(app).get('/files').set(auth(token))).body.files.map((f) => f.id);
 
-const diskFiles = async () => fs.readdir(process.env.UPLOAD_DIR).catch(() => []);
+const diskFiles = async () => fs.readdir(config.uploadDir).catch(() => []);
 
 const expectError = (res, status, code) => {
   expect(res.status).toBe(status);
@@ -69,7 +70,7 @@ describe('POST /files', () => {
   test('guarda los bytes en disco con el id como nombre y los metadatos en PostgreSQL', async () => {
     const res = await upload(ana.token, fixtures.pdf, 'informe.pdf');
 
-    const onDisk = await fs.readFile(path.join(process.env.UPLOAD_DIR, res.body.id));
+    const onDisk = await fs.readFile(path.join(config.uploadDir, res.body.id));
     expect(onDisk.equals(fixtures.pdf)).toBe(true);
 
     const { rows } = await pool.query('SELECT user_id, original_name FROM files WHERE id = $1', [res.body.id]);

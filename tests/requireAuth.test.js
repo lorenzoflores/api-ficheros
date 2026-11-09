@@ -1,11 +1,13 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const requireAuth = require('../src/middleware/requireAuth');
 const errorHandler = require('../src/middleware/errorHandler');
 const { signAccessToken } = require('../src/services/tokenService');
+const { config } = require('../src/config');
 
 // App mínima: aún no hay endpoints de ficheros, así que el middleware se prueba aislado.
 const app = express();
@@ -13,7 +15,7 @@ app.get('/protegido', requireAuth, (req, res) => res.json({ user: req.user }));
 app.use(errorHandler);
 
 const USER_ID = '6f1c2b6e-3d1a-4c55-9d7e-2b7f5e0a9c11';
-const SECRET = () => process.env.JWT_SECRET;
+const SECRET = () => config.jwt.secret;
 
 const get = (authorization) => {
   const req = request(app).get('/protegido');
@@ -47,7 +49,7 @@ describe('middleware requireAuth', () => {
   });
 
   test('A-06: un token firmado con otro secreto responde 401 UNAUTHORIZED', async () => {
-    const token = jwt.sign({}, 'otro-secreto-distinto-de-al-menos-32-chars', { subject: USER_ID });
+    const token = jwt.sign({}, crypto.randomBytes(48).toString('base64'), { subject: USER_ID });
 
     expectUnauthorized(await get(`Bearer ${token}`));
   });

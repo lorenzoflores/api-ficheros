@@ -1,6 +1,7 @@
 'use strict';
 
 const AppError = require('../services/AppError');
+const { config } = require('../config');
 
 // Traduce errores conocidos de body-parser (Express) a errores de la API.
 function fromBodyParser(err) {
@@ -22,7 +23,7 @@ function errorHandler(err, req, res, next) {
   const appError = err instanceof AppError ? err : fromBodyParser(err);
 
   if (!appError) {
-    if (process.env.NODE_ENV !== 'test') console.error(err);
+    if (config.env !== 'test') console.error(err);
     return res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: 'Error interno del servidor' },
     });
