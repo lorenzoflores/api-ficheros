@@ -1,0 +1,8 @@
+node_modules/
+uploads/
+coverage/
+
+# Variables de entorno: se ignora .env pero se versiona .env.example
+.env
+.env.*
+!.env.example
