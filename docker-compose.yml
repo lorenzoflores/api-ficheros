@@ -21,9 +21,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Aplica las migraciones pendientes y después arranca la API. "exec" sustituye el shell
-    # por node, que queda como PID 1 y recibe SIGTERM al hacer docker compose stop.
-    command: ["sh", "-c", "node src/db/migrate.js && exec node src/server.js"]
+    # Las migraciones se aplican al arrancar el contenedor (CMD del Dockerfile).
 
   db:
     image: postgres:16-alpine

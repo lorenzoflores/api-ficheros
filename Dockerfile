@@ -40,5 +40,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
-# node directamente (no npm start) para que el proceso sea el PID 1 y reciba SIGTERM.
-CMD ["node", "src/server.js"]
+# Aplica las migraciones pendientes y después arranca la API, para que una base de datos
+# nueva tenga siempre sus tablas sin depender de la plataforma (Railway, compose...).
+# Si las migraciones fallan, el contenedor no arranca. Son seguras con varias instancias:
+# migrate.js toma un bloqueo en PostgreSQL (pg_advisory_lock).
+# "exec" sustituye el shell por node (no npm start), que queda como PID 1 y recibe SIGTERM.
+CMD ["sh", "-c", "node src/db/migrate.js && exec node src/server.js"]
