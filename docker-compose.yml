@@ -1,0 +1,45 @@
+# Arranque: docker compose up -d --build
+# Compose lee el fichero .env de esta carpeta para rellenar las variables ${...}.
+# Solo se toman de .env las variables que aparecen aquí: no se usa env_file porque el
+# .env de desarrollo apunta a localhost y a ./uploads, que no sirven dentro del contenedor.
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/ficheros
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env (mínimo 32 caracteres)}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      MAX_FILE_SIZE_BYTES: ${MAX_FILE_SIZE_BYTES:-10485760}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-5}
+      # PORT=3000, UPLOAD_DIR=/data/uploads y NODE_ENV=production vienen del Dockerfile.
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    # Las migraciones se aplican al arrancar el contenedor (CMD del Dockerfile).
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ficheros
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sin "ports": la base de datos solo es accesible desde la red interna de compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ficheros"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  uploads:
+  pgdata:

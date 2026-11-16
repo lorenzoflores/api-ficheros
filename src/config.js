@@ -62,6 +62,15 @@ const envSchema = z.object({
       .max(PG_INTEGER_MAX, { error: `no puede superar ${PG_INTEGER_MAX}` })
       .default(10 * 1024 * 1024),
   ),
+  // Número de proxies de confianza delante de la API (Express "trust proxy").
+  // 0 = ninguno: X-Forwarded-For se ignora y req.ip es la IP de la conexión.
+  TRUST_PROXY: optional(
+    z.coerce
+      .number({ error: 'debe ser un número entero mayor o igual que 0' })
+      .int({ error: 'debe ser un número entero mayor o igual que 0' })
+      .min(0, { error: 'debe ser un número entero mayor o igual que 0' })
+      .default(0),
+  ),
 });
 
 // Función pura: valida un objeto de entorno y devuelve la configuración tipada.
@@ -80,6 +89,7 @@ function loadConfig(env) {
     // Las rutas relativas se resuelven desde la raíz del proyecto, no desde el directorio actual.
     uploadDir: path.resolve(PROJECT_ROOT, e.UPLOAD_DIR),
     maxFileSizeBytes: e.MAX_FILE_SIZE_BYTES,
+    trustProxy: e.TRUST_PROXY,
   });
 }
 

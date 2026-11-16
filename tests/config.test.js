@@ -32,6 +32,7 @@ describe('loadConfig', () => {
       jwt: { secret: VALID.JWT_SECRET, expiresInSeconds: 3600 },
       uploadDir: path.resolve(__dirname, '..', 'uploads'),
       maxFileSizeBytes: 10485760,
+      trustProxy: 0,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -43,12 +44,14 @@ describe('loadConfig', () => {
       JWT_EXPIRES_IN: '15m',
       UPLOAD_DIR: '/var/datos',
       MAX_FILE_SIZE_BYTES: '5242880',
+      TRUST_PROXY: '1',
     });
 
     expect(config.port).toBe(8080);
     expect(config.jwt.expiresInSeconds).toBe(900);
     expect(config.uploadDir).toBe('/var/datos');
     expect(config.maxFileSizeBytes).toBe(5242880);
+    expect(config.trustProxy).toBe(1);
   });
 
   test.each([
@@ -87,6 +90,9 @@ describe('loadConfig', () => {
     ['MAX_FILE_SIZE_BYTES', '1.5'],
     ['MAX_FILE_SIZE_BYTES', '3000000000'],
     ['NODE_ENV', 'staging'],
+    ['TRUST_PROXY', '-1'],
+    ['TRUST_PROXY', '1.5'],
+    ['TRUST_PROXY', 'true'],
   ])('%s=%s no es válido', (key, value) => {
     const issues = issuesOf({ ...VALID, [key]: value });
 

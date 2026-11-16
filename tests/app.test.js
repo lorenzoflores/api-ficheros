@@ -2,6 +2,7 @@
 
 const request = require('supertest');
 const app = require('../src/app');
+const { config } = require('../src/config');
 const { pool } = require('../src/db/pool');
 
 afterAll(() => pool.end());
@@ -23,6 +24,11 @@ describe('Comportamiento transversal de la app', () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: { code: 'VALIDATION_ERROR', message: expect.any(String) } });
     expect(JSON.stringify(res.body)).not.toMatch(/\n\s+at /);
+  });
+
+  test('aplica TRUST_PROXY de la configuración (0 por defecto: no se confía en ningún proxy)', () => {
+    expect(app.get('trust proxy')).toBe(config.trustProxy);
+    expect(config.trustProxy).toBe(0);
   });
 
   test('helmet añade cabeceras de seguridad y oculta X-Powered-By', async () => {
