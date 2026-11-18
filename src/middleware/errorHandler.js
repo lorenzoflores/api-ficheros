@@ -1,7 +1,6 @@
 'use strict';
 
 const AppError = require('../services/AppError');
-const { config } = require('../config');
 
 // Traduce errores conocidos de body-parser (Express) a errores de la API.
 function fromBodyParser(err) {
@@ -23,7 +22,9 @@ function errorHandler(err, req, res, next) {
   const appError = err instanceof AppError ? err : fromBodyParser(err);
 
   if (!appError) {
-    if (config.env !== 'test') console.error(err);
+    // requestLogger lo incluye (con su stack) en la línea de log de esta petición, a nivel error.
+    // Al cliente nunca le llega: solo el código y un mensaje genérico.
+    res.err = err;
     return res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: 'Error interno del servidor' },
     });

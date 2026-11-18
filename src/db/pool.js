@@ -2,6 +2,7 @@
 
 const { Pool } = require('pg');
 const { config } = require('../config');
+const { logger } = require('../logger');
 
 const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -10,7 +11,7 @@ const pool = new Pool({
 
 // Un error en un cliente inactivo no debe tumbar el proceso.
 pool.on('error', (err) => {
-  console.error('Error inesperado en el pool de PostgreSQL:', err.message);
+  logger.error({ err }, 'Error inesperado en el pool de PostgreSQL');
 });
 
 module.exports = { pool };

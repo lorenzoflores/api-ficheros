@@ -2,9 +2,12 @@
 
 const path = require('node:path');
 const { z } = require('zod');
+const pkg = require('../package.json');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const PG_INTEGER_MAX = 2_147_483_647; // files.size_bytes es INTEGER
+// Versión desplegada, para agrupar los errores en Sentry: "api-ficheros@1.0.0".
+const RELEASE = `${pkg.name}@${pkg.version}`;
 const DURATION_UNITS = { s: 1, m: 60, h: 3600, d: 86400 };
 
 class ConfigError extends Error {
@@ -71,6 +74,31 @@ const envSchema = z.object({
       .min(0, { error: 'debe ser un número entero mayor o igual que 0' })
       .default(0),
   ),
+  // Sin valor: "silent" en tests e "info" en el resto (se resuelve en loadConfig).
+  LOG_LEVEL: optional(
+    z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'], {
+        error: 'debe ser fatal, error, warn, info, debug, trace o silent',
+      })
+      .optional(),
+  ),
+  // Sentry es opcional: sin SENTRY_DSN no se inicializa y no se envía nada.
+  // Se exige el formato de DSN que acepta el SDK (clave sin guiones, proyecto tras la última /):
+  // con un DSN mal escrito, Sentry se desactivaría sin avisar.
+  SENTRY_DSN: optional(
+    z
+      .string()
+      .regex(/^https?:\/\/\w+(?::\w*)?@[\w.-]+(?::\d+)?\/\S+$/, {
+        error: 'debe ser la DSN del proyecto de Sentry: https://<clave>@<host>/<proyecto>',
+      })
+      .optional(),
+  ),
+  // Sin valor se usa NODE_ENV (se resuelve en loadConfig).
+  SENTRY_ENVIRONMENT: optional(z.string().optional()),
+  // Token que exige GET /metrics. Sin él, el endpoint responde 404.
+  METRICS_TOKEN: optional(
+    z.string().min(16, { error: 'debe tener al menos 16 caracteres' }).optional(),
+  ),
 });
 
 // Función pura: valida un objeto de entorno y devuelve la configuración tipada.
@@ -90,6 +118,10 @@ function loadConfig(env) {
     uploadDir: path.resolve(PROJECT_ROOT, e.UPLOAD_DIR),
     maxFileSizeBytes: e.MAX_FILE_SIZE_BYTES,
     trustProxy: e.TRUST_PROXY,
+    logLevel: e.LOG_LEVEL ?? (e.NODE_ENV === 'test' ? 'silent' : 'info'),
+    sentry: Object.freeze({ dsn: e.SENTRY_DSN, environment: e.SENTRY_ENVIRONMENT ?? e.NODE_ENV }),
+    release: RELEASE,
+    metricsToken: e.METRICS_TOKEN,
   });
 }
 

@@ -2,6 +2,7 @@
 
 const { pipeline } = require('node:stream/promises');
 const fileService = require('../services/fileService');
+const { filesUploadedTotal } = require('../metrics');
 
 // Content-Disposition con el formato de SPEC 1.3: attachment; filename="<name>".
 // Si el nombre no es ASCII imprimible, filename lleva una versión ASCII y filename* (RFC 5987) el original.
@@ -20,6 +21,7 @@ function contentDisposition(name) {
 
 async function upload(req, res) {
   const file = await fileService.upload(req.user.id, req.file);
+  filesUploadedTotal.inc({ mime_type: file.mimeType });
   res.status(201).json(file);
 }
 

@@ -1,5 +1,6 @@
 'use strict';
 
+const Sentry = require('@sentry/node');
 const AppError = require('../services/AppError');
 const { verifyAccessToken } = require('../services/tokenService');
 
@@ -21,6 +22,8 @@ function requireAuth(req, res, next) {
   if (typeof payload.sub !== 'string' || payload.sub === '') return next(unauthorized());
 
   req.user = { id: payload.sub };
+  // Solo el id: ni email ni IP (sendDefaultPii: false en instrument.js).
+  Sentry.setUser({ id: payload.sub });
   return next();
 }
 

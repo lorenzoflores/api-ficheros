@@ -1,25 +1,28 @@
 'use strict';
 
+require('./instrument'); // Sentry: tiene que ir antes que cualquier otro módulo.
+
 // La configuración se valida al cargarla: si falta una variable obligatoria o
 // JWT_SECRET es demasiado corto, el servidor no arranca (SPEC 1.8).
+const { exitOnConfigError } = require('./startupError');
+
 let config;
 try {
   ({ config } = require('./config'));
 } catch (err) {
-  if (err.name !== 'ConfigError') throw err;
-  console.error(err.message);
-  process.exit(1);
+  exitOnConfigError(err);
 }
 
 const app = require('./app');
 const { pool } = require('./db/pool');
+const { logger } = require('./logger');
 
 const server = app.listen(config.port, () => {
-  console.log(`API escuchando en http://localhost:${config.port}`);
+  logger.info({ port: config.port, env: config.env }, 'API escuchando');
 });
 
 function shutdown(signal) {
-  console.log(`${signal} recibido, cerrando...`);
+  logger.info({ signal }, 'Señal recibida, cerrando...');
   server.close(async () => {
     await pool.end();
     process.exit(0);

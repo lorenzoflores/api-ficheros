@@ -21,6 +21,11 @@ module.exports = [
     },
   },
   {
+    // En la aplicación todo pasa por el logger (src/logger.js): nada de console.*.
+    files: ['src/**/*.js'],
+    rules: { 'no-console': 'error' },
+  },
+  {
     files: ['tests/**/*.js'],
     languageOptions: { globals: globals.jest },
   },
