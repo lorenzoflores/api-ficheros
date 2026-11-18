@@ -35,7 +35,7 @@ describe('loadConfig', () => {
       maxFileSizeBytes: 10485760,
       trustProxy: 0,
       logLevel: 'info',
-      sentry: { dsn: undefined, environment: 'development' },
+      sentry: { dsn: undefined, environment: 'development', tracesSampleRate: 0 },
       release: `${pkg.name}@${pkg.version}`,
       metricsToken: undefined,
     });
@@ -104,12 +104,26 @@ describe('loadConfig', () => {
     ['SENTRY_DSN', 'ftp://clave@sentry.example.com/1'],
     ['SENTRY_DSN', 'https://clave-con-guiones@sentry.example.com/1'],
     ['SENTRY_DSN', 'https://sentry.example.com/1'],
+    ['SENTRY_TRACES_SAMPLE_RATE', '1.5'],
+    ['SENTRY_TRACES_SAMPLE_RATE', '-0.1'],
+    ['SENTRY_TRACES_SAMPLE_RATE', 'todas'],
     ['METRICS_TOKEN', 'corto-15-chars!'],
   ])('%s=%s no es válido', (key, value) => {
     const issues = issuesOf({ ...VALID, [key]: value });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(new RegExp(`^${key}: `));
+  });
+
+  test.each([
+    ['0', 0],
+    ['1', 1],
+    ['0.1', 0.1],
+    ['', 0], // declarada pero vacía, como en .env.example: se aplica el valor por defecto
+  ])('SENTRY_TRACES_SAMPLE_RATE=%p da tracesSampleRate %p', (value, expected) => {
+    const config = loadConfig({ ...VALID, SENTRY_TRACES_SAMPLE_RATE: value });
+
+    expect(config.sentry.tracesSampleRate).toBe(expected);
   });
 
   test('LOG_LEVEL: silent por defecto en tests, info en el resto, y se respeta si se indica', () => {

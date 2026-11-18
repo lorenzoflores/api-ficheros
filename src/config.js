@@ -95,6 +95,15 @@ const envSchema = z.object({
   ),
   // Sin valor se usa NODE_ENV (se resuelve en loadConfig).
   SENTRY_ENVIRONMENT: optional(z.string().optional()),
+  // Fracción de peticiones que se envían a Sentry como trazas de rendimiento (0 a 1).
+  // 0 = solo errores. En staging 1 (todas); en producción, 0.1 o menos.
+  SENTRY_TRACES_SAMPLE_RATE: optional(
+    z.coerce
+      .number({ error: 'debe ser un número entre 0 y 1' })
+      .min(0, { error: 'debe ser un número entre 0 y 1' })
+      .max(1, { error: 'debe ser un número entre 0 y 1' })
+      .default(0),
+  ),
   // Token que exige GET /metrics. Sin él, el endpoint responde 404.
   METRICS_TOKEN: optional(
     z.string().min(16, { error: 'debe tener al menos 16 caracteres' }).optional(),
@@ -119,7 +128,11 @@ function loadConfig(env) {
     maxFileSizeBytes: e.MAX_FILE_SIZE_BYTES,
     trustProxy: e.TRUST_PROXY,
     logLevel: e.LOG_LEVEL ?? (e.NODE_ENV === 'test' ? 'silent' : 'info'),
-    sentry: Object.freeze({ dsn: e.SENTRY_DSN, environment: e.SENTRY_ENVIRONMENT ?? e.NODE_ENV }),
+    sentry: Object.freeze({
+      dsn: e.SENTRY_DSN,
+      environment: e.SENTRY_ENVIRONMENT ?? e.NODE_ENV,
+      tracesSampleRate: e.SENTRY_TRACES_SAMPLE_RATE,
+    }),
     release: RELEASE,
     metricsToken: e.METRICS_TOKEN,
   });
