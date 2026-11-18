@@ -1,5 +1,6 @@
 'use strict';
 
+const http = require('node:http');
 const request = require('supertest');
 const app = require('../src/app');
 const { pool, resetDb } = require('./helpers/db');
@@ -146,6 +147,56 @@ describe('Contenido de las métricas', () => {
     expect(value(after, 'http_errors_total', labels) - value(before, 'http_errors_total', labels)).toBe(1);
     expect(value(after, 'http_request_duration_seconds_count', labels) -
       value(before, 'http_request_duration_seconds_count', labels)).toBe(1);
+  });
+
+  test('una petición que el cliente corta se cuenta con status_code="aborted"', async () => {
+    const labels = { method: 'POST', route: '/files', status_code: 'aborted' };
+    const before = value(await scrape(), 'http_requests_total', labels);
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    try {
+      // Subida que anuncia 1 MB, envía unos pocos bytes y corta la conexión.
+      await new Promise((resolve) => {
+        const req = http.request({
+          port: server.address().port,
+          method: 'POST',
+          path: '/files',
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+            'Content-Type': 'multipart/form-data; boundary=corte',
+            'Content-Length': 1_000_000,
+          },
+        });
+        req.on('error', () => {}); // esperado: la conexión se corta a propósito
+        req.write('--corte\r\nContent-Disposition: form-data; name="file"; filename="a.txt"\r\n\r\nhola');
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 100);
+      });
+
+      // El servidor se entera del corte de forma asíncrona: se espera a que aparezca.
+      let after = before;
+      for (let i = 0; i < 50 && after === before; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        after = value(await scrape(), 'http_requests_total', labels);
+      }
+      expect(after - before).toBe(1);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  test('si falla el cálculo de storage_bytes, /metrics responde 200, conserva el valor y lo cuenta', async () => {
+    const before = await scrape();
+    jest.spyOn(pool, 'query').mockRejectedValueOnce(new Error('sin conexión'));
+
+    const res = await getMetrics();
+
+    expect(res.status).toBe(200);
+    const errors = (text) => value(text, 'metrics_collect_errors_total', { metric: 'storage_bytes' });
+    expect(errors(res.text) - errors(before)).toBe(1);
+    expect(value(res.text, 'storage_bytes')).toBe(value(before, 'storage_bytes'));
   });
 
   test('el token de métricas y los JWT nunca aparecen en la salida', async () => {

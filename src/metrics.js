@@ -42,30 +42,61 @@ const filesUploadedTotal = new client.Counter({
   registers: [register],
 });
 
-// Se calcula al pedir /metrics. Si la consulta falla se conserva el último valor:
-// una métrica no debe dejar /metrics sin responder.
-new client.Gauge({
+// storage_bytes se calcula al pedir /metrics. Si la consulta falla se conserva el último
+// valor (una métrica no debe dejar /metrics sin responder) y el fallo se cuenta en
+// metrics_collect_errors_total, para que un dato obsoleto no parezca correcto.
+//
+// prom-client lee todas las métricas en paralelo: las dos esperan a la misma consulta
+// (una sola por petición a /metrics), y así el contador refleja el fallo en esa misma
+// respuesta y no en la siguiente.
+let pendingStorageRefresh = null;
+
+function refreshStorage() {
+  pendingStorageRefresh ??= (async () => {
+    try {
+      const { rows } = await pool.query('SELECT COALESCE(SUM(size_bytes), 0)::bigint AS total FROM files');
+      storageBytes.set(Number(rows[0].total));
+    } catch (err) {
+      metricsCollectErrorsTotal.inc({ metric: 'storage_bytes' });
+      logger.warn({ err }, 'No se pudo calcular storage_bytes');
+    } finally {
+      pendingStorageRefresh = null;
+    }
+  })();
+  return pendingStorageRefresh;
+}
+
+const storageBytes = new client.Gauge({
   name: 'storage_bytes',
   help: 'Bytes ocupados por los ficheros subidos (SUM(size_bytes) de files)',
   registers: [register],
-  async collect() {
-    try {
-      const { rows } = await pool.query('SELECT COALESCE(SUM(size_bytes), 0)::bigint AS total FROM files');
-      this.set(Number(rows[0].total));
-    } catch (err) {
-      logger.warn({ err }, 'No se pudo calcular storage_bytes');
-    }
-  },
+  collect: refreshStorage,
 });
 
-// Mide cada petición al terminar la respuesta, cuando ya se conocen la ruta y el código.
+const metricsCollectErrorsTotal = new client.Counter({
+  name: 'metrics_collect_errors_total',
+  help: 'Errores al calcular una métrica al pedir /metrics',
+  labelNames: ['metric'],
+  registers: [register],
+  collect: refreshStorage,
+});
+
+// Mide cada petición cuando se cierra la respuesta. Se usa "close" y no "finish":
+// "close" se emite siempre, también cuando el cliente corta la conexión antes de recibir
+// la respuesta (subida cancelada, timeout de un proxy). Esas peticiones se etiquetan con
+// status_code="aborted" para que no desaparezcan de las métricas justo en los casos lentos.
 function metricsMiddleware(req, res, next) {
   const stopTimer = httpRequestDuration.startTimer();
-  res.on('finish', () => {
-    const labels = { method: req.method, route: routePath(req), status_code: String(res.statusCode) };
+  res.once('close', () => {
+    const finished = res.writableFinished;
+    const labels = {
+      method: req.method,
+      route: routePath(req),
+      status_code: finished ? String(res.statusCode) : 'aborted',
+    };
     stopTimer(labels);
     httpRequestsTotal.inc(labels);
-    if (res.statusCode >= 500) httpErrorsTotal.inc(labels);
+    if (finished && res.statusCode >= 500) httpErrorsTotal.inc(labels);
   });
   next();
 }

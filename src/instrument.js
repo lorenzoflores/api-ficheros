@@ -43,8 +43,10 @@ function sentryOptions(config) {
 let config = null;
 try {
   ({ config } = require('./config'));
-} catch {
-  // Configuración inválida: server.js lo notifica y termina. Sentry no se inicializa.
+} catch (err) {
+  // Configuración inválida: server.js lo notifica y termina; Sentry no se inicializa.
+  // Cualquier otro error (módulo ausente, error de sintaxis...) no se oculta.
+  if (err.name !== 'ConfigError') throw err;
 }
 
 if (config?.sentry.dsn) {

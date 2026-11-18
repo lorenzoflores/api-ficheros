@@ -65,6 +65,41 @@ describe('Inicialización (instrument.js)', () => {
     return init;
   };
 
+  const loadInstrumentWithConfigError = (error) => {
+    const init = jest.fn();
+    let thrown;
+    jest.isolateModules(() => {
+      jest.doMock('@sentry/node', () => ({ init }));
+      jest.doMock('../src/config', () => {
+        throw error;
+      });
+      try {
+        require('../src/instrument');
+      } catch (err) {
+        thrown = err;
+      }
+    });
+    jest.dontMock('@sentry/node');
+    jest.dontMock('../src/config');
+    return { init, thrown };
+  };
+
+  test('con una configuración inválida (ConfigError) se carga sin inicializar Sentry', () => {
+    const { init, thrown } = loadInstrumentWithConfigError(Object.assign(new Error('x'), { name: 'ConfigError' }));
+
+    expect(thrown).toBeUndefined(); // server.js es quien informa del error y termina
+    expect(init).not.toHaveBeenCalled();
+  });
+
+  test('cualquier otro error al cargar la configuración no se oculta', () => {
+    const error = new SyntaxError('error de sintaxis en config.js');
+
+    const { init, thrown } = loadInstrumentWithConfigError(error);
+
+    expect(thrown).toBe(error);
+    expect(init).not.toHaveBeenCalled();
+  });
+
   test('sin SENTRY_DSN no inicializa Sentry: no se envía nada', () => {
     expect(loadInstrumentWith({ SENTRY_DSN: '' })).not.toHaveBeenCalled();
   });
