@@ -115,6 +115,17 @@ describe('loadConfig', () => {
     expect(issues[0]).toMatch(new RegExp(`^${key}: `));
   });
 
+  test.each([
+    ['0', 0],
+    ['1', 1],
+    ['0.1', 0.1],
+    ['', 0], // declarada pero vacía, como en .env.example: se aplica el valor por defecto
+  ])('SENTRY_TRACES_SAMPLE_RATE=%p da tracesSampleRate %p', (value, expected) => {
+    const config = loadConfig({ ...VALID, SENTRY_TRACES_SAMPLE_RATE: value });
+
+    expect(config.sentry.tracesSampleRate).toBe(expected);
+  });
+
   test('LOG_LEVEL: silent por defecto en tests, info en el resto, y se respeta si se indica', () => {
     expect(loadConfig({ ...VALID, NODE_ENV: 'test' }).logLevel).toBe('silent');
     expect(loadConfig({ ...VALID, NODE_ENV: 'production' }).logLevel).toBe('info');
