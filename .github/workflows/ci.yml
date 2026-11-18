@@ -1,0 +1,73 @@
+# Integración continua reutilizable: la llaman otros workflows (p. ej. pr.yml).
+name: CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint y tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ficheros_test
+        ports:
+          - 5432:5432
+        # El job no empieza hasta que PostgreSQL acepta conexiones.
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ficheros_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # tests/setupEnv.js usa esta URL para DATABASE_URL (los tests nunca usan otra base de datos).
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/ficheros_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  audit:
+    name: Auditoría de dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Solo dependencias de producción; falla con vulnerabilidades high o critical.
+      # npm audit lee package-lock.json, no necesita npm ci.
+      - run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: Búsqueda de secretos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # todo el historial, no solo el último commit
+      # --redact: si encuentra algo, el log no muestra el valor del secreto.
+      - name: gitleaks (todo el historial)
+        run: >-
+          docker run --rm -v "${{ github.workspace }}:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.28.0
+          git /repo --redact --verbose --no-banner --exit-code 1
+
+  build:
+    name: Construir imagen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t api-ficheros:ci .
