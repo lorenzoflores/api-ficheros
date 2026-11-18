@@ -26,6 +26,17 @@ describe('Comportamiento transversal de la app', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/\n\s+at /);
   });
 
+  test('un JSON de más de 100 KB responde 413 PAYLOAD_TOO_LARGE sin stack trace', async () => {
+    const res = await request(app)
+      .post('/auth/login')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ email: 'ana@example.com', password: 'a'.repeat(101 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(res.body).toEqual({ error: { code: 'PAYLOAD_TOO_LARGE', message: expect.any(String) } });
+    expect(JSON.stringify(res.body)).not.toMatch(/\n\s+at /);
+  });
+
   test('aplica TRUST_PROXY de la configuración (0 por defecto: no se confía en ningún proxy)', () => {
     expect(app.get('trust proxy')).toBe(config.trustProxy);
     expect(config.trustProxy).toBe(0);
