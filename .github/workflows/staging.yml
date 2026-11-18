@@ -1,0 +1,59 @@
+name: Despliegue en staging
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Un despliegue a la vez en staging. No se cancela el que está en curso: cortar
+# "railway up" a medias puede dejar el entorno en un estado intermedio.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Desplegar en staging
+    needs: ci # solo si pasa toda la CI
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.APP_URL }}
+    # La URL se pasa al job siguiente como salida: así ese job no necesita declarar el
+    # entorno otra vez (lo que crearía un segundo despliegue en GitHub).
+    outputs:
+      app_url: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Instalar la CLI de Railway
+        run: npm install --global @railway/cli@5
+
+      # --ci sigue los logs del build y falla si el despliegue falla.
+      - name: Desplegar
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} # token de proyecto del entorno staging
+        run: railway up --ci --service "${{ vars.RAILWAY_SERVICE }}" --environment staging
+
+  smoke-test:
+    name: Comprobar /health en staging
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      # Reintenta durante ~2 minutos: el despliegue nuevo puede tardar en recibir tráfico.
+      - name: GET /health
+        env:
+          APP_URL: ${{ needs.deploy.outputs.app_url }}
+        run: |
+          curl --fail --silent --show-error --max-time 10 \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "${APP_URL%/}/health"

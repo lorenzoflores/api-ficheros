@@ -1,0 +1,80 @@
+name: Despliegue en producción
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# Un despliegue a la vez en producción. No se cancela el que está en curso: cortar
+# "railway up" a medias puede dejar el entorno en un estado intermedio.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  tag-on-main:
+    name: Comprobar que el tag está en main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # historial completo y todas las ramas, incluida origin/main
+
+      # Solo se publica en producción código que ya ha pasado por main (y por staging).
+      # ^{commit} resuelve también los tags anotados al commit al que apuntan.
+      - name: git merge-base --is-ancestor
+        run: |
+          commit="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          if git merge-base --is-ancestor "$commit" origin/main; then
+            echo "El commit ${commit} del tag ${GITHUB_REF_NAME} está en main."
+          else
+            echo "::error::El tag ${GITHUB_REF_NAME} apunta a ${commit}, que no está en main. Solo se despliegan en producción tags de commits de main."
+            exit 1
+          fi
+
+  ci:
+    needs: tag-on-main
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Desplegar en producción
+    needs: ci # solo si el tag está en main y pasa toda la CI
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    # La URL se pasa al job siguiente como salida: así ese job no necesita declarar el
+    # entorno otra vez (con revisores obligatorios, pediría una segunda aprobación).
+    outputs:
+      app_url: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Instalar la CLI de Railway
+        run: npm install --global @railway/cli@5
+
+      # --ci sigue los logs del build y falla si el despliegue falla.
+      - name: Desplegar
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} # token de proyecto del entorno production
+        run: railway up --ci --service "${{ vars.RAILWAY_SERVICE }}" --environment production
+
+  smoke-test:
+    name: Comprobar /health en producción
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      # Reintenta durante ~2 minutos: el despliegue nuevo puede tardar en recibir tráfico.
+      - name: GET /health
+        env:
+          APP_URL: ${{ needs.deploy.outputs.app_url }}
+        run: |
+          curl --fail --silent --show-error --max-time 10 \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "${APP_URL%/}/health"
