@@ -32,7 +32,8 @@ function sentryOptions(config) {
     environment: config.sentry.environment,
     release: config.release,
     sendDefaultPii: false,
-    tracesSampleRate: 0, // solo errores, sin trazas de rendimiento
+    // SENTRY_TRACES_SAMPLE_RATE: 0 = solo errores; 1 = todas las peticiones como trazas.
+    tracesSampleRate: config.sentry.tracesSampleRate ?? 0,
     // Nunca adjuntar valores de variables locales: en authService.login una de ellas es la contraseña.
     // Ya es el valor por defecto; se fija para no depender de él.
     includeLocalVariables: false,

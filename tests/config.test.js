@@ -35,7 +35,7 @@ describe('loadConfig', () => {
       maxFileSizeBytes: 10485760,
       trustProxy: 0,
       logLevel: 'info',
-      sentry: { dsn: undefined, environment: 'development' },
+      sentry: { dsn: undefined, environment: 'development', tracesSampleRate: 0 },
       release: `${pkg.name}@${pkg.version}`,
       metricsToken: undefined,
     });
@@ -104,6 +104,9 @@ describe('loadConfig', () => {
     ['SENTRY_DSN', 'ftp://clave@sentry.example.com/1'],
     ['SENTRY_DSN', 'https://clave-con-guiones@sentry.example.com/1'],
     ['SENTRY_DSN', 'https://sentry.example.com/1'],
+    ['SENTRY_TRACES_SAMPLE_RATE', '1.5'],
+    ['SENTRY_TRACES_SAMPLE_RATE', '-0.1'],
+    ['SENTRY_TRACES_SAMPLE_RATE', 'todas'],
     ['METRICS_TOKEN', 'corto-15-chars!'],
   ])('%s=%s no es válido', (key, value) => {
     const issues = issuesOf({ ...VALID, [key]: value });

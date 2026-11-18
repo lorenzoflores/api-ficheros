@@ -69,6 +69,12 @@ describe('Inicialización (instrument.js)', () => {
     expect(loadInstrumentWith({ SENTRY_DSN: '' })).not.toHaveBeenCalled();
   });
 
+  test('con SENTRY_TRACES_SAMPLE_RATE envía esa fracción de trazas', () => {
+    const init = loadInstrumentWith({ SENTRY_DSN: DSN, SENTRY_TRACES_SAMPLE_RATE: '0.25' });
+
+    expect(init.mock.calls[0][0].tracesSampleRate).toBe(0.25);
+  });
+
   test('con SENTRY_DSN inicializa sin PII, sin trazas y con release <name>@<version>', () => {
     const init = loadInstrumentWith({ SENTRY_DSN: DSN, SENTRY_ENVIRONMENT: 'staging' });
 
