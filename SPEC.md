@@ -235,3 +235,5 @@ Preparación: los usuarios **A** y **B** están registrados; **A** ha subido el 
 - Todos los tests de las secciones 3.1–3.6 pasan con `npm test` en Node 22.
 - Ningún test depende de servicios externos ni del orden de ejecución.
 - Ningún endpoint de la sección 2 existe.
+
+<!-- Cambio de prueba para validar el flujo de PR hacia develop. -->
