@@ -1,8 +1,10 @@
 name: Despliegue en staging
 
+# Cada PR fusionado en develop se despliega en staging. Producción va aparte:
+# tags v* sobre commits de main (production.yml).
 on:
   push:
-    branches: [main]
+    branches: [develop]
 
 permissions:
   contents: read
