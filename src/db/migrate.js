@@ -7,7 +7,8 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 // Clave arbitraria para pg_advisory_lock: evita que dos procesos migren a la vez.
 const LOCK_KEY = 727001;
 
-async function migrate(pool, { log = console.log } = {}) {
+// log: función para informar de cada migración (el script la conecta al logger).
+async function migrate(pool, { log = () => {} } = {}) {
   const client = await pool.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
@@ -49,16 +50,15 @@ if (require.main === module) {
   try {
     require('../config');
   } catch (err) {
-    if (err.name !== 'ConfigError') throw err;
-    console.error(err.message);
-    process.exit(1);
+    require('../startupError').exitOnConfigError(err);
   }
   const { pool } = require('./pool');
+  const { logger } = require('../logger');
 
-  migrate(pool)
+  migrate(pool, { log: (msg) => logger.info(msg) })
     .then(() => pool.end())
     .catch(async (err) => {
-      console.error(err.message);
+      logger.error({ err }, 'Fallo al aplicar las migraciones');
       await pool.end();
       process.exitCode = 1;
     });

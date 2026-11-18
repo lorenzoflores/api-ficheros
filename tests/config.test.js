@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { loadConfig, ConfigError } = require('../src/config');
+const pkg = require('../package.json');
 
 const VALID = {
   DATABASE_URL: 'postgres://usuario:clave@localhost:5432/bd',
@@ -33,6 +34,10 @@ describe('loadConfig', () => {
       uploadDir: path.resolve(__dirname, '..', 'uploads'),
       maxFileSizeBytes: 10485760,
       trustProxy: 0,
+      logLevel: 'info',
+      sentry: { dsn: undefined, environment: 'development' },
+      release: `${pkg.name}@${pkg.version}`,
+      metricsToken: undefined,
     });
     expect(Object.isFrozen(config)).toBe(true);
   });
@@ -93,11 +98,25 @@ describe('loadConfig', () => {
     ['TRUST_PROXY', '-1'],
     ['TRUST_PROXY', '1.5'],
     ['TRUST_PROXY', 'true'],
+    ['LOG_LEVEL', 'verbose'],
+    ['LOG_LEVEL', 'INFO'],
+    ['SENTRY_DSN', 'no es una url'],
+    ['SENTRY_DSN', 'ftp://clave@sentry.example.com/1'],
+    ['SENTRY_DSN', 'https://clave-con-guiones@sentry.example.com/1'],
+    ['SENTRY_DSN', 'https://sentry.example.com/1'],
+    ['METRICS_TOKEN', 'corto-15-chars!'],
   ])('%s=%s no es válido', (key, value) => {
     const issues = issuesOf({ ...VALID, [key]: value });
 
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatch(new RegExp(`^${key}: `));
+  });
+
+  test('LOG_LEVEL: silent por defecto en tests, info en el resto, y se respeta si se indica', () => {
+    expect(loadConfig({ ...VALID, NODE_ENV: 'test' }).logLevel).toBe('silent');
+    expect(loadConfig({ ...VALID, NODE_ENV: 'production' }).logLevel).toBe('info');
+    expect(loadConfig({ ...VALID, NODE_ENV: 'production', LOG_LEVEL: 'warn' }).logLevel).toBe('warn');
+    expect(loadConfig({ ...VALID, NODE_ENV: 'test', LOG_LEVEL: 'debug' }).logLevel).toBe('debug');
   });
 
   test('el mensaje de error nunca incluye el valor de la variable', () => {

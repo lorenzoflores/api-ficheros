@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { pool } = require('../db/pool');
 const { config } = require('../config');
+const { logger } = require('../logger');
 const AppError = require('./AppError');
 const { detectMimeType } = require('./fileTypeService');
 
@@ -116,7 +117,7 @@ async function remove(userId, fileId) {
   try {
     await fs.rm(diskPath(rows[0].id), { force: true });
   } catch (err) {
-    console.error(`No se pudo borrar del disco el fichero ${rows[0].id}:`, err.message);
+    logger.error({ err, fileId: rows[0].id }, 'No se pudo borrar del disco el fichero');
   }
 }
 

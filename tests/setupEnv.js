@@ -18,5 +18,15 @@ process.env.JWT_SECRET = crypto.randomBytes(48).toString('base64');
 process.env.JWT_EXPIRES_IN = '1h';
 process.env.MAX_FILE_SIZE_BYTES = String(10 * 1024 * 1024);
 
+// Sin logs en la salida de los tests aunque .env defina LOG_LEVEL. Los tests de logging
+// crean su propio logger con un destino en memoria.
+process.env.LOG_LEVEL = 'silent';
+
+// Los tests nunca envían nada a Sentry, aunque .env defina SENTRY_DSN.
+process.env.SENTRY_DSN = '';
+
+// Token de /metrics aleatorio en cada ejecución (los tests lo leen de process.env).
+process.env.METRICS_TOKEN = crypto.randomBytes(24).toString('base64url');
+
 // Los ficheros subidos en los tests van a una carpeta temporal, nunca a ./uploads.
 process.env.UPLOAD_DIR = path.join(os.tmpdir(), 'api-ficheros-tests');
